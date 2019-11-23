@@ -1,0 +1,175 @@
+README PROIECT PA
+--ETAPA 3--
+
+
+=================
+Instructiuni de compilare
+=================
+
+python ./run.py --cmd "java MyBot" --round 3
+
+
+=================
+Detalii despre structura proiectului
+=================
+
+Pentru aceasta etapa am schimbat complet strategia, astfel am facut urmatoarele
+modificari:
+
+==========
+MyBot.java
+==========
+-Fiecare ship poate avea doua stari : "miner"(nava merge in cautare de halite) 
+->status = 1 sau "return home" (nava se intoarce spre casa pentru a aduce 
+cantitatea de halite acumulata)->status = 2. De asemenea, pentru fiecare ship se
+calculeaza un target.
+-De fiecarea data cand ship-ul ajunge acasa campul status se seteaza pe  
+valoarea 1, iar atunci cand cantitatea de halite acumulata de nava este mai mare 
+de 850(ship-ul e aproape plin) valoarea din campul status devine 2. 
+-Pentru ultimele ture, pentru a ne asigura ca ship-urile nu se indeparteaza prea 
+mult de casa si aduc halite-ul inainte ca jocul sa se termine am scazut 
+cantitatea pe care trebuie sa o adune la 750, 600 si 450 in functie de numarul 
+de ture. 
+-Contorizarea statusului pentru fiecare ship a fost facuta astfel: avem un 
+hashmap si pentru fiecare id al unei nave avem statusul aferent.
+-Astfel, jocul se desfasoara asa: pentru fiecare tura verificam daca shipyard-ul 
+este blocat de inamic, daca este asa atunci celula nu mai este marcata ca fiind 
+ocupata pentru a putea elibera casa. Apoi, parcurgem array-ul de ship-uri si 
+pentru fiecare verificam :
+	--daca este nou (caz in care initializam cu statusul 1 - merge in 
+cautare de halite si pozitia anterioara null), 
+	-- daca ship-ul este full ii schimbam statusul in 2 (merge acasa). 
+-Apoi, in functie de statusul actual, calculam cea mai buna directie de mers 
+acasa sau dupa halite:
+		~ status 2: apelam metoda navigatorHome (explicata in sectiunea 
+clasei Extra) si folosim aceasta directie pentru a ajunge acasa. In cazul in 
+care ship-ul a ajuns pe shipyard, ii schimbam statusul in 1 si pozitia 
+anterioara redevine null.
+		~ status 1: pentru acest caz luam deciziile sa stam tot pe 
+aceeasi celula pentru a mina (daca are suficient halite) sau sa ne mutam pe o 
+alta celula daca e mai "profitabil", caz in care folosim metodata navigator, 
+marcam celula ca fiind ocupata si apoi actualizam pozitia anterioara (in cazul 
+in care noua pozitie nu este aceeasi ca cea anterioara).
+-Apoi, verificam daca putem construi o noua nava, verificand conditiile: 
+	1 - ne aflam in primele 190 ture, 
+	2 - avem suficient halite sa construim o nava, 
+	3 - nu exista o alta nava pe celula shipyard-ului.
+
+
+
+==========
+Extra.java
+==========
+
+	------> metoda navigator <------
+-primeste ca parametri un Ship ship, un Direction prevDir, un GamMap gameMap,
+un int min, un Shipyard enemy si un Player me
+-intoarce directia optima pe care trebuie sa se deplaseze nava pentru a aduna 
+halite
+-in primul rand cream un ArrayList de directii unde vom pastra directiile valide
+-ulterior, pentru fiecare directie (EAST, WEST, NORTH, SOUTH) daca este valida 
+sau nu.
+-daca aceasta este neocupata si daca functia enemy_safe(explicata mai jos) 
+intoarce true vom adauga directia in ArrayList ul de directii
+-avand in vedere ca noi vrem sa gasim casuta cu cel mai mult halite, vom ordona 
+directiile din ArrayList descrescator dupa numarul de halite din fiecare casuta 
+corespunzatoare;
+-in cazul in care nava noastra se afla pe Shipyard-ul inamicului sau daca 
+ArrayList-ul este gol ramanem pe loc;
+-daca nava noastra a primit anterior o directie si daca pozitia cu cel mai mare 
+halite pe care ar trebui sa ne mutam are mai putin halite decat min (dat ca 
+parametru) se va intoarce prevDir => nava isi va pastra directia
+-altfel, daca directia din campul ship-ului nu este ocupata si daca ship-ul se 
+afla pe shipyard vom intoarce acea directia.
+-in caz contrar, se va intoarce directia de pe pozitia 0 din ArrayList-ul de 
+directii;
+
+
+	------> metoda navigatorHome <------
+-primeste ca parametri un final Ship (ship-ul), un final Position(destinatia la
+care se doreste sa se ajunga) si un GameMap;
+-returneaza un Direction(directia optima de deplasare pentru ship pentru a 
+ajunge la destinatie-destinatie ce va fi de fapt reprezentata de pozitia casei);
+-in implementarea acestei metode se utilizeaza metoda getUnsafeMoves pentru a
+pune intr-un ArrayList toate posibilele directii de deplasare pentru ship catre
+destinatie, dupa care se realizeaza o ordonare a acestora crescator, in functie
+de cantitatea de halite (deoarece, asa cum am precizat, metoda va fi folosita
+pentru a se realiza intoarcerea navelor spre casa trebuie sa ne asiguram ca vom
+folosi un drum de cost minim);
+-dupa ordonarea acestui ArrayList, il parcurgem si intoarcem prima directie 
+pentru care pozitia corespunzatoare mutarii ship-ului conform ei nu este 
+ocupata, marcand-o ca ocupata inainte de a returna directia
+-daca nu gasim nicio astfel de directie, atunci nava va ramane pe loc si se va
+intoarce Direction.STILL;
+
+
+
+============
+MapCell.java
+============
+
+	------> metoda enemy_safe <------
+-primeste ca parametri un GameMap gameMap si un Player me;
+-returneaza un boolean (true - daca toate celulele vecine cu celula curenta
+sunt libere sau ocupate de nave care apartin jucatorului me; false - daca
+exista cel putin o celula vecina cu celula curenta care sa fie ocupata de o
+nava inamica);
+-metoda verifica daca toate cele 4 celule vecine cu celula curenta (sus, jos,
+stanga, dreapta) sunt libere sau ocupate de nave apartinand noua(jucatorului me)
+caz in care se intoarce true, oferindu-se o asigurare ca celula curenta este 
+sigura;
+-insa, daca exista cel putin o celula vecina care sa nu respecte aceasta 
+conditie, atunci celula nu este sigura si se va intoarce false 
+-cu ajutorul metodei enemy_safe vrem sa ne asiguram ca pastram distanta fata de
+adversar pentru a evita o posibila ciocnire cu acesta (astfel, atunci cand se
+doreste mutarea navei pe o anumita celula se foloseste aceasta metoda pentru
+a ne asigura ca mutarea se face in siguranta, nava noastra aflandu-se cel putin
+la o celula distanta de adversar);
+
+
+
+==========
+Ship.java
+==========
+	->am adaugat un camp nou:
+		-public final Direction direction - in care pastram o directie
+default de deplasare pentru fiecare nava, directie care este stabilita in cadrul 
+constructorului, alegerea directiei facandu-se in functie de restul obtinut in 
+urma impartirii id-ului navei la 4(existand 4 directii posibile de deplasare 
+pentru o nava)
+
+
+
+=================
+Detalii despre abordarea algoritmica a etapei
+=================
+
+
+	In primul rand, in aceasta etapa, am urmarit gasirea unui maxim local de 
+halite (alegerea celulei din jur cu cel mai mult halite). 
+	O alta noua strategie priveste shipyard-urile: in cazul in care ajungem 
+pe casa oponentului decidem sa ramanem acolo (pentru a o bloca) si daca inamicul 
+ajunge la noi, il eliminam. 
+	De asemenea, si scaderea cantitatii de halite in ultimele ture ne ajuta 
+sa ajungem acasa cu cat mai mult halite, iar o strategie de baza pe care am 
+pastrat-o de tura trecuta este de a cataloga ship-urile dupa status: mineaza sau 
+merge acasa.
+	Totodata, o alta strategie abordata consta in pastrarea distantei fata
+de adversar cu cel putin o celula.
+
+
+=================
+Surse de inspiratie
+=================
+
+
+https:://forums.halite.io/t/collection-of-post-mortems-bot-source-code/1335.html
+
+
+=================
+Responsabilitatea fiecarui membru al echipei
+=================
+
+
+Mateescu Cristina si Dinica Diana s-au ocupat de scrierea codului;
+Lupu Andreea si Dobre Anca au stabilit strategia;
